@@ -1,0 +1,70 @@
+#!/usr/bin/env python
+
+from bs4 import BeautifulSoup
+import zipfile
+import sys
+import requests
+import StringIO
+import os
+
+def get_file(url):
+	sys.stderr.write("Downloading from "+url+"\n")
+	r = requests.get(url, allow_redirects = True)
+	if r.status_code != 200:
+		sys.stderr.write("Error: status "+str(r.status_code)+" received\n")
+		sys.exit(1)
+	if not (len(r.content) > 0 and ('content-type' in r.headers.keys()) and r.headers['content-type'] == 'application/epub+zip'):
+		sys.stderr.write("Error: something didn't validate.\n")
+		sys.exit(1)
+	if len(r.content) != int(r.headers['content-length']):
+		sys.stderr.write("Error: download doesn't match content length\n")
+		sys.exit(1)
+	srcfile = StringIO.StringIO(r.content)
+	return srcfile
+
+def fix_string(html):
+	bs = BeautifulSoup(html, "html.parser")
+	return str(bs)
+
+def fix(story_id, outfile_path):
+	# Get the file-like object representing the incoming ZIP file.
+	url = "https://www.fimfiction.net/download_epub.php?story="+str(story_id)
+	srcfile = get_file(url)
+	
+	# Create a zip file representation of the source file
+	srczip = zipfile.ZipFile(srcfile)
+	
+	# Create an output file to write the data to
+	outfile = StringIO.StringIO()
+	outzip = zipfile.ZipFile(outfile, 'w', zipfile.ZIP_DEFLATED)
+	
+	# This is where the meat of the operation happens
+	for info_item in srczip.infolist():
+		object = srczip.read(info_item)
+		# Fix the HTML here
+		base_file, ext = os.path.splitext(info_item.filename)
+		if ext.lower() == ".html":
+			object = fix_string(object)
+		outzip.writestr(info_item.filename, object)
+	outzip.close()
+	
+	# Write the contents to stdout, or a file if one is provided
+	outfile.seek(0)
+	if outfile_path == None:
+		sys.stdout.write(outfile.read())
+		sys.stdout.flush()
+	else:
+		with open(outfile_path,'w') as outfile_f:
+			outfile.seek(0)
+			outfile_f.write(outfile.read())
+
+if __name__=='__main__':
+	try:
+		story = int(sys.argv[1])
+		outfile_path = None
+		if len(sys.argv) > 2:
+			outfile_path = os.path.abspath(sys.argv[2])
+	except:
+		sys.stderr.write("Usage: fix story_id [outfile]\n")
+		sys.exit(1)
+	fix(story, outfile_path)
