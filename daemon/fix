@@ -35,7 +35,10 @@ def fix(story_id, outfile_path):
 	srczip = zipfile.ZipFile(srcfile)
 	
 	# Create an output file to write the data to
-	outfile = StringIO.StringIO()
+	if outfile_path == None:
+		outfile = StringIO.StringIO()
+	else:
+		outfile = open(outfile_path,'w')
 	outzip = zipfile.ZipFile(outfile, 'w', zipfile.ZIP_DEFLATED)
 	
 	# This is where the meat of the operation happens
@@ -48,15 +51,13 @@ def fix(story_id, outfile_path):
 		outzip.writestr(info_item.filename, object)
 	outzip.close()
 	
-	# Write the contents to stdout, or a file if one is provided
-	outfile.seek(0)
+	# Write the contents to stdout, or close the file if it's there
 	if outfile_path == None:
+		outfile.seek(0)
 		sys.stdout.write(outfile.read())
 		sys.stdout.flush()
 	else:
-		with open(outfile_path,'w') as outfile_f:
-			outfile.seek(0)
-			outfile_f.write(outfile.read())
+		outfile.close()
 
 if __name__=='__main__':
 	try:
